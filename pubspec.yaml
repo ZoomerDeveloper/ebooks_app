@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.0+5
 
 environment:
   sdk: ^3.8.1
@@ -81,6 +81,32 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+
+  fonts:
+    - family: Arial Black
+      fonts:
+        - asset: assets/fonts/arial_black.ttf
+    - family: Rampart One
+      fonts:
+        - asset: assets/fonts/RampartOne-Regular.ttf
+    - family: Calibri
+      fonts:
+        - asset: assets/fonts/calibri.ttf
+        - asset: assets/fonts/calibri_bold.ttf
+          weight: 700
+    - family: Cambria
+      fonts:
+        - asset: assets/fonts/Cambria.ttf
+        - asset: assets/fonts/Cambria-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Cambria-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Cambria-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: PhoneticTM
+      fonts:
+        - asset: assets/fonts/phonetictm.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -4,80 +4,99 @@ import '../models/subscription.dart';
 import '../models/stats.dart';
 import '../models/app_config.dart';
 import '../models/poem.dart';
+import '../mixins/auto_cache_mixin.dart';
 
-class AppDataProvider with ChangeNotifier {
+class AppDataProvider with ChangeNotifier, AutoCacheMixin {
   final ApiService _apiService;
 
   Subscription? _subscription;
   Stats? _stats;
   AppConfig? _appConfig;
   List<Poem> _favorites = [];
-  bool _isLoading = false;
   String? _error;
+
+  // Ключи для кэша
+  static const _statsKey = 'stats';
+  static const _favoritesKey = 'favorites';
+  static const _subscriptionKey = 'subscription';
+  static const _appConfigKey = 'appConfig';
 
   AppDataProvider(this._apiService);
 
-  Subscription? get subscription => _subscription;
-  Stats? get stats => _stats;
-  AppConfig? get appConfig => _appConfig;
-  List<Poem> get favorites => _favorites;
-  bool get isLoading => _isLoading;
+  Subscription? get subscription =>
+      getCached<Subscription>(_subscriptionKey) ?? _subscription;
+  Stats? get stats => getCached<Stats>(_statsKey) ?? _stats;
+  AppConfig? get appConfig => getCached<AppConfig>(_appConfigKey) ?? _appConfig;
+  List<Poem> get favorites =>
+      getCached<List<Poem>>(_favoritesKey) ?? _favorites;
+
+  // Общий isLoading проверяет загрузку любого ресурса
+  bool get isLoading =>
+      isLoadingFor(_statsKey) ||
+      isLoadingFor(_favoritesKey) ||
+      isLoadingFor(_subscriptionKey) ||
+      isLoadingFor(_appConfigKey);
+
   String? get error => _error;
 
-  Future<void> loadAppConfig() async {
+  Future<void> loadAppConfig({bool forceRefresh = false}) async {
     try {
-      _appConfig = await _apiService.getConfig();
-      notifyListeners();
+      _appConfig = await fetchWithCache<AppConfig>(
+        key: _appConfigKey,
+        fetcher: () => _apiService.getConfig(),
+        forceRefresh: forceRefresh,
+        cacheDuration: const Duration(hours: 1), // Конфиг редко меняется
+      );
     } catch (e) {
       _error = e.toString();
       notifyListeners();
     }
   }
 
-  Future<void> loadSubscription() async {
-    _isLoading = true;
+  Future<void> loadSubscription({bool forceRefresh = false}) async {
     _error = null;
-    notifyListeners();
 
     try {
-      _subscription = await _apiService.getSubscriptionStatus();
-      _isLoading = false;
-      notifyListeners();
+      _subscription = await fetchWithCache<Subscription>(
+        key: _subscriptionKey,
+        fetcher: () => _apiService.getSubscriptionStatus(),
+        forceRefresh: forceRefresh,
+        cacheDuration: const Duration(minutes: 2),
+      );
     } catch (e) {
       _error = e.toString();
-      _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> loadStats() async {
-    _isLoading = true;
+  Future<void> loadStats({bool forceRefresh = false}) async {
     _error = null;
-    notifyListeners();
 
     try {
-      _stats = await _apiService.getStats();
-      _isLoading = false;
-      notifyListeners();
+      _stats = await fetchWithCache<Stats>(
+        key: _statsKey,
+        fetcher: () => _apiService.getStats(),
+        forceRefresh: forceRefresh,
+      );
     } catch (e) {
       _error = e.toString();
-      _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> loadFavorites() async {
-    _isLoading = true;
+  Future<void> loadFavorites({bool forceRefresh = false}) async {
     _error = null;
-    notifyListeners();
 
     try {
-      _favorites = await _apiService.getFavorites();
-      _isLoading = false;
-      notifyListeners();
+      _favorites =
+          await fetchWithCache<List<Poem>>(
+            key: _favoritesKey,
+            fetcher: () => _apiService.getFavorites(),
+            forceRefresh: forceRefresh,
+          ) ??
+          [];
     } catch (e) {
       _error = e.toString();
-      _isLoading = false;
       notifyListeners();
     }
   }
@@ -85,7 +104,9 @@ class AppDataProvider with ChangeNotifier {
   Future<bool> addToFavorites(int poemId) async {
     try {
       await _apiService.addToFavorites(poemId);
-      await loadFavorites();
+      // Инвалидируем кэш и загружаем заново
+      clearCache(_favoritesKey);
+      await loadFavorites(forceRefresh: true);
       return true;
     } catch (e) {
       _error = e.toString();
@@ -97,7 +118,9 @@ class AppDataProvider with ChangeNotifier {
   Future<bool> removeFromFavorites(int poemId) async {
     try {
       await _apiService.removeFromFavorites(poemId);
-      await loadFavorites();
+      // Инвалидируем кэш и загружаем заново
+      clearCache(_favoritesKey);
+      await loadFavorites(forceRefresh: true);
       return true;
     } catch (e) {
       _error = e.toString();

@@ -29,9 +29,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = authProvider.user;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Профиль', style: AppTextStyles.h3),
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.background,
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
         elevation: 0,
       ),
       body: SafeArea(
@@ -41,6 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               // Profile Header
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: AppColors.primaryGradient,

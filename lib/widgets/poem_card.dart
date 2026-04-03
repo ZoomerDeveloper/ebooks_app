@@ -11,9 +11,22 @@ class PoemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = colorScheme.brightness == Brightness.dark;
+    // final primaryGradient = LinearGradient(
+    //   colors: [colorScheme.primary, colorScheme.secondary],
+    //   begin: Alignment.topLeft,
+    //   end: Alignment.bottomRight,
+    // );
+    final primaryGradient = LinearGradient(
+      colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? Colors.white : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -33,32 +46,32 @@ class PoemCard extends StatelessWidget {
             child: Row(
               children: [
                 // Letter badge with gradient
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      poem.letter,
-                      style: AppTextStyles.h3.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
+                // Container(
+                //   width: 56,
+                //   height: 56,
+                //   decoration: BoxDecoration(
+                //     gradient: primaryGradient,
+                //     borderRadius: BorderRadius.circular(16),
+                //     boxShadow: [
+                //       BoxShadow(
+                //         color: colorScheme.primary.withOpacity(0.3),
+                //         blurRadius: 8,
+                //         offset: const Offset(0, 4),
+                //       ),
+                //     ],
+                //   ),
+                //   child: Center(
+                //     child: Text(
+                //       poem.letter,
+                //       style: AppTextStyles.h3.copyWith(
+                //         color: Colors.white,
+                //         fontWeight: FontWeight.bold,
+                //         fontSize: 24,
+                //       ),
+                //     ),
+                //   ),
+                // ),
+                // const SizedBox(width: 16),
                 // Poem info
                 Expanded(
                   child: Column(
@@ -79,6 +92,7 @@ class PoemCard extends StatelessWidget {
                         poem.phonetic,
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.textSecondary,
+                          fontFamily: 'PhoneticTM',
                           fontStyle: FontStyle.italic,
                           fontSize: 14,
                         ),
@@ -125,7 +139,7 @@ class PoemCard extends StatelessWidget {
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.arrow_forward_ios,
                       size: 14,
                       color: AppColors.primary,

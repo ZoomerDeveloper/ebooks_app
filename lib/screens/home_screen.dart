@@ -32,10 +32,17 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // Load first letter by default
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PoemProvider>().preloadLetterPoemCounts(
+        AppConstants.alphabet,
+      );
       _selectLetter('A');
       // Load app config for subscription page (no auth required)
       final appDataProvider = context.read<AppDataProvider>();
       appDataProvider.loadAppConfig();
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.isAuthenticated) {
+        appDataProvider.loadSubscription();
+      }
     });
 
     // Listen to page changes to load data when needed
@@ -134,6 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final isGuest = !authProvider.isAuthenticated;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
@@ -231,23 +239,24 @@ class _HomeScreenState extends State<HomeScreen> {
           slivers: [
             // Large Header with gradient
             SliverAppBar(
-              expandedHeight: 220,
+              expandedHeight: 168,
               floating: false,
               pinned: true,
-              toolbarHeight: 220,
+              toolbarHeight: 168,
               elevation: 0,
+              automaticallyImplyLeading: false,
               backgroundColor: AppColors.primary,
               flexibleSpace: FlexibleSpaceBar(
                 collapseMode: CollapseMode.parallax,
                 centerTitle: false,
                 titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
                 background: Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: AppColors.primaryGradient,
                   ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                      padding: const EdgeInsets.fromLTRB(24, 10, 24, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -312,14 +321,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Text(
                             'Учите английский через поэзию',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: Colors.white.withOpacity(0.9),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           TextField(
                             controller: _searchController,
                             onChanged: _search,
@@ -476,6 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   AppConstants.alphabet[letterIndex1],
                                   AppConstants.alphabet[letterIndex1] ==
                                       _selectedLetter,
+                                  poemProvider,
                                 ),
                               ),
                             ),
@@ -490,6 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   AppConstants.alphabet[letterIndex2],
                                   AppConstants.alphabet[letterIndex2] ==
                                       _selectedLetter,
+                                  poemProvider,
                                 ),
                               ),
                             ),
@@ -524,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (poemProvider.error != null)
+            else if (_isSearching && poemProvider.error != null)
               SliverFillRemaining(
                 child: Center(
                   child: Padding(
@@ -570,7 +581,7 @@ class _HomeScreenState extends State<HomeScreen> {
             //     ),
             //   ),
             // )
-            else
+            else if (_isSearching)
               // Content
               SliverPadding(
                 padding: const EdgeInsets.all(16),
@@ -597,11 +608,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildLetterCard(String letter, bool isSelected) {
+  Widget _buildLetterCard(
+    String letter,
+    bool isSelected,
+    PoemProvider poemProvider,
+  ) {
+    final poemCount = poemProvider.poemCountForLetter(letter);
+    final isCountLoading =
+        poemCount == null && poemProvider.isLoadingLetterCounts;
+    final countLabel = isCountLoading
+        ? '...'
+        : poemCount == null
+        ? '—'
+        : _formatPoemCount(poemCount);
+
     return GestureDetector(
       onTap: () => _selectLetter(letter),
       child: Container(
-        height: 80,
+        height: 170,
         decoration: BoxDecoration(
           gradient: isSelected ? AppColors.primaryGradient : null,
           color: isSelected ? null : Colors.white,
@@ -616,18 +640,69 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        child: Center(
-          child: Text(
-            letter,
-            style: AppTextStyles.h1.copyWith(
-              color: isSelected ? Colors.white : AppColors.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 32,
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.center,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Text(
+                  letter,
+                  style: AppTextStyles.h1.copyWith(
+                    fontFamily: 'Rampart One',
+                    color: isSelected ? Colors.white : AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 72,
+                  ),
+                ),
+              ),
             ),
-          ),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.18)
+                      : AppColors.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  countLabel,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.caption.copyWith(
+                    color: isSelected ? Colors.white : AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String _formatPoemCount(int count) {
+    final mod10 = count % 10;
+    final mod100 = count % 100;
+
+    if (mod100 >= 11 && mod100 <= 14) {
+      return '$count стихов';
+    }
+    if (mod10 == 1) {
+      return '$count стих';
+    }
+    if (mod10 >= 2 && mod10 <= 4) {
+      return '$count стиха';
+    }
+    return '$count стихов';
   }
 
   Widget _buildExpandedPoems(PoemProvider poemProvider) {
@@ -727,40 +802,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
-}
-
-class _AlphabetHeaderDelegate extends SliverPersistentHeaderDelegate {
-  final double minHeight;
-  final double maxHeight;
-  final Widget child;
-
-  _AlphabetHeaderDelegate({
-    required this.minHeight,
-    required this.maxHeight,
-    required this.child,
-  });
-
-  @override
-  double get minExtent => minHeight;
-
-  @override
-  double get maxExtent => maxHeight;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return SizedBox.expand(child: child);
-  }
-
-  @override
-  bool shouldRebuild(_AlphabetHeaderDelegate oldDelegate) {
-    return maxHeight != oldDelegate.maxHeight ||
-        minHeight != oldDelegate.minHeight ||
-        child != oldDelegate.child;
   }
 }
 

@@ -22,14 +22,21 @@ class GradientButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final gradient = LinearGradient(
+      colors: [colorScheme.primary, colorScheme.secondary],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+
     return Container(
       width: width ?? double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        gradient: isOutlined ? null : AppColors.primaryGradient,
+        gradient: isOutlined ? null : gradient,
         borderRadius: BorderRadius.circular(16),
         border: isOutlined
-            ? Border.all(color: AppColors.primary, width: 2)
+            ? Border.all(color: colorScheme.primary, width: 2)
             : null,
       ),
       child: Material(
@@ -52,9 +59,7 @@ class GradientButton extends StatelessWidget {
                   : Text(
                       text,
                       style: AppTextStyles.button.copyWith(
-                        color: isOutlined
-                            ? AppColors.primary
-                            : AppColors.textWhite,
+                        color: isOutlined ? colorScheme.primary : AppColors.textWhite,
                       ),
                     ),
             ),

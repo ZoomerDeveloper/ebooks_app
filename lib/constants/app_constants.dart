@@ -5,6 +5,8 @@ class AppConstants {
   // Storage Keys
   static const String keyToken = 'auth_token';
   static const String keyOnboardingComplete = 'onboarding_complete';
+  static const String keyReaderBackgroundMode = 'reader_background_mode';
+  static const String keyReaderAccentColor = 'reader_accent_color';
 
   // Alphabet
   static const List<String> alphabet = [

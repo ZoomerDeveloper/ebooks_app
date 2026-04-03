@@ -155,7 +155,7 @@ class StatsTab extends StatelessWidget {
                         height: 200,
                         child: CustomPaint(
                           painter: ProgressCirclePainter(
-                            progress: stats!.progressPercent / 100,
+                            progress: stats.progressPercent / 100,
                           ),
                           child: Center(
                             child: Column(

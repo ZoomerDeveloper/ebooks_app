@@ -112,9 +112,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('Premium', style: AppTextStyles.h3),
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.background,
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
         elevation: 0,
       ),
       body: Consumer<AppDataProvider>(

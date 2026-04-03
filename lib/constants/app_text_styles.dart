@@ -75,9 +75,10 @@ class AppTextStyles {
   );
 
   // Poem specific
-  static TextStyle poemWord = GoogleFonts.poppins(
-    fontSize: 28,
-    fontWeight: FontWeight.bold,
+  static TextStyle poemWord = const TextStyle(
+    fontFamily: 'Arial',
+    fontSize: 14,
+    fontWeight: FontWeight.w900,
     color: AppColors.primary,
   );
 
@@ -88,25 +89,28 @@ class AppTextStyles {
     fontStyle: FontStyle.italic,
   );
 
-  static TextStyle poemText = GoogleFonts.crimsonText(
+  static TextStyle poemText = const TextStyle(
+    fontFamily: 'Calibri',
     fontSize: 18,
     fontWeight: FontWeight.normal,
     color: AppColors.textPrimary,
-    height: 1.8,
+    height: 1.45,
   );
 
-  static TextStyle poemContextWord = GoogleFonts.crimsonText(
+  static TextStyle poemContextWord = const TextStyle(
+    fontFamily: 'Arial',
     fontSize: 18,
-    fontWeight: FontWeight.bold,
-    fontStyle: FontStyle.italic,
+    fontWeight: FontWeight.w900,
     color: AppColors.primary,
-    height: 1.8,
+    fontStyle: FontStyle.italic,
+    height: 1.45,
   );
 
-  static TextStyle poemUppercase = GoogleFonts.crimsonText(
-    fontSize: 24,
+  static TextStyle poemUppercase = const TextStyle(
+    fontFamily: 'Cambria',
+    fontSize: 28,
     fontWeight: FontWeight.bold,
     color: AppColors.textPrimary,
-    height: 1.8,
+    height: 1.45,
   );
 }
