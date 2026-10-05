@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/app_constants.dart';
 import '../services/api_service.dart';
 import '../models/subscription.dart';
 import '../models/stats.dart';
@@ -13,11 +14,13 @@ class AppDataProvider with ChangeNotifier, AutoCacheMixin {
   Stats? _stats;
   AppConfig? _appConfig;
   List<Poem> _favorites = [];
+  List<Poem> _readHistory = [];
   String? _error;
 
   // Ключи для кэша
   static const _statsKey = 'stats';
   static const _favoritesKey = 'favorites';
+  static const _readHistoryKey = 'readHistory';
   static const _subscriptionKey = 'subscription';
   static const _appConfigKey = 'appConfig';
 
@@ -29,13 +32,17 @@ class AppDataProvider with ChangeNotifier, AutoCacheMixin {
   AppConfig? get appConfig => getCached<AppConfig>(_appConfigKey) ?? _appConfig;
   List<Poem> get favorites =>
       getCached<List<Poem>>(_favoritesKey) ?? _favorites;
+  List<Poem> get readHistory => getCached<List<Poem>>(_readHistoryKey) ?? _readHistory;
 
   // Общий isLoading проверяет загрузку любого ресурса
   bool get isLoading =>
       isLoadingFor(_statsKey) ||
       isLoadingFor(_favoritesKey) ||
+      isLoadingFor(_readHistoryKey) ||
       isLoadingFor(_subscriptionKey) ||
       isLoadingFor(_appConfigKey);
+
+  bool get isLoadingReadHistory => isLoadingFor(_readHistoryKey);
 
   String? get error => _error;
 
@@ -101,6 +108,23 @@ class AppDataProvider with ChangeNotifier, AutoCacheMixin {
     }
   }
 
+  Future<void> loadReadHistory({bool forceRefresh = false}) async {
+    _error = null;
+
+    try {
+      _readHistory =
+          await fetchWithCache<List<Poem>>(
+                key: _readHistoryKey,
+                fetcher: () => _apiService.getReadHistory(),
+                forceRefresh: forceRefresh,
+              ) ??
+          [];
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
   Future<bool> addToFavorites(int poemId) async {
     try {
       await _apiService.addToFavorites(poemId);
@@ -129,13 +153,29 @@ class AppDataProvider with ChangeNotifier, AutoCacheMixin {
     }
   }
 
+  Future<bool> markAsLearned(int poemId) async {
+    try {
+      await _apiService.markAsLearned(poemId);
+      clearCache(_statsKey);
+      await loadStats(forceRefresh: true);
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   bool isFavorite(int poemId) {
     return _favorites.any((poem) => poem.id == poemId);
   }
 
-  Future<String?> createPayment() async {
+  Future<Map<String, dynamic>?> createPayment({required String planId}) async {
     try {
-      return await _apiService.createPayment();
+      return await _apiService.createPayment(
+        planId: planId,
+        returnUrl: AppConstants.paymentReturnUrl,
+      );
     } catch (e) {
       _error = e.toString();
       notifyListeners();

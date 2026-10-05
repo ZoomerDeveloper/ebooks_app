@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'constants/app_colors.dart';
 import 'constants/app_text_styles.dart';
 import 'services/api_service.dart';
+import 'services/app_navigation_service.dart';
 import 'services/storage_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/poem_provider.dart';
@@ -31,7 +32,7 @@ void main() async {
   final storageService = StorageService();
   await storageService.init();
 
-  final apiService = ApiService();
+  final apiService = ApiService(storageService: storageService);
 
   runApp(MyApp(storageService: storageService, apiService: apiService));
 }
@@ -65,8 +66,9 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer<ReaderSettingsProvider>(
         builder: (context, readerSettings, _) => MaterialApp(
-          title: 'Epoems',
+          title: 'Smart Poems',
           debugShowCheckedModeBanner: false,
+          navigatorKey: AppNavigationService.navigatorKey,
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(
@@ -131,9 +133,15 @@ class MyApp extends StatelessWidget {
                   builder: (context) => const HomeScreen(),
                 );
               case '/poem':
-                final poemId = settings.arguments as int? ?? 0;
+                final arguments = settings.arguments;
+                final args = arguments is PoemScreenArgs
+                    ? arguments
+                    : PoemScreenArgs(poemId: arguments as int? ?? 0);
                 return MaterialPageRoute(
-                  builder: (context) => PoemScreen(poemId: poemId),
+                  builder: (context) => PoemScreen(
+                    poemId: args.poemId,
+                    openedFromLetter: args.openedFromLetter,
+                  ),
                 );
               case '/profile':
                 return MaterialPageRoute(

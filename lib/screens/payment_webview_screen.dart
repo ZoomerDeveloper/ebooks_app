@@ -5,8 +5,13 @@ import '../constants/app_text_styles.dart';
 
 class PaymentWebViewScreen extends StatefulWidget {
   final String checkoutUrl;
+  final String returnUrlPrefix;
 
-  const PaymentWebViewScreen({super.key, required this.checkoutUrl});
+  const PaymentWebViewScreen({
+    super.key,
+    required this.checkoutUrl,
+    required this.returnUrlPrefix,
+  });
 
   @override
   State<PaymentWebViewScreen> createState() => _PaymentWebViewScreenState();
@@ -15,6 +20,10 @@ class PaymentWebViewScreen extends StatefulWidget {
 class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
+
+  bool _isReturnUrl(String url) {
+    return url.startsWith(widget.returnUrlPrefix);
+  }
 
   @override
   void initState() {
@@ -25,6 +34,13 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
       ..setBackgroundColor(Colors.white)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            if (_isReturnUrl(request.url)) {
+              Navigator.of(context).pop(true);
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
           onProgress: (int progress) {
             if (progress == 100) {
               setState(() {
@@ -37,11 +53,7 @@ class _PaymentWebViewScreenState extends State<PaymentWebViewScreen> {
               _isLoading = true;
             });
 
-            // Check if payment was completed (redirected to return_url)
-            // Important: check if it starts with the return URL, not just contains it
-            if (url.startsWith('https://yourapp.com/payment/result') ||
-                url.startsWith('http://yourapp.com/payment/result')) {
-              // Payment completed, close WebView
+            if (_isReturnUrl(url)) {
               Navigator.of(context).pop(true);
             }
           },

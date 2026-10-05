@@ -1,11 +1,14 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
+import '../../constants/app_constants.dart';
 import '../../constants/app_text_styles.dart';
 import '../../widgets/gradient_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/common_widgets.dart';
 import '../../providers/auth_provider.dart';
+import '../webview_screen.dart';
 import 'verification_code_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -176,6 +179,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       isLoading: authProvider.isLoading,
                     );
                   },
+                ),
+                const SizedBox(height: 16),
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textLight,
+                    ),
+                    children: [
+                      const TextSpan(
+                        text: 'Регистрируясь, вы соглашаетесь с ',
+                      ),
+                      TextSpan(
+                        text: 'Политикой конфиденциальности',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const WebViewScreen(
+                                    url: AppConstants.privacyPolicyUrl,
+                                    title: 'Политика конфиденциальности',
+                                  ),
+                                ),
+                              ),
+                      ),
+                      const TextSpan(text: '.'),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
                 // Login Link

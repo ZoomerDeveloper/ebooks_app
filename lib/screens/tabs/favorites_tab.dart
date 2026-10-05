@@ -15,7 +15,10 @@ class FavoritesTab extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Избранное', style: AppTextStyles.h3),
+        title: Text(
+          'Избранное',
+          style: AppTextStyles.h3.copyWith(letterSpacing: 1.0),
+        ),
         backgroundColor: AppColors.background,
         iconTheme: IconThemeData(color: AppColors.textPrimary),
         elevation: 0,
@@ -65,9 +68,14 @@ class FavoritesTab extends StatelessWidget {
                     onPressed: onNavigateToHome,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
+                      fixedSize: Size(
+                        MediaQuery.of(context).size.width - 40,
+                        50,
+                      ),
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
-                        vertical: 16,
+                        // vertical: 16,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

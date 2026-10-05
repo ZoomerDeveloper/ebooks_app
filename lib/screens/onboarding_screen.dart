@@ -70,7 +70,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Text(
                   'Пропустить',
                   style: AppTextStyles.bodyLarge.copyWith(
-                    color: AppColors.primary,
+                    color: Colors.white.withOpacity(0.8),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -155,7 +155,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           // Title
           Text(
             page.title,
-            style: AppTextStyles.h2,
+            style: AppTextStyles.h2.copyWith(color: Colors.white),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -163,7 +163,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             page.description,
             style: AppTextStyles.bodyLarge.copyWith(
-              color: AppColors.textSecondary,
+              color: Colors.white.withOpacity(0.75),
             ),
             textAlign: TextAlign.center,
           ),

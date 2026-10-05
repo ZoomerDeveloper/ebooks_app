@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_text_styles.dart';
 import '../models/poem.dart';
+import '../providers/app_data_provider.dart';
 
 class PoemCard extends StatelessWidget {
   final Poem poem;
@@ -13,6 +15,8 @@ class PoemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = colorScheme.brightness == Brightness.dark;
+    final paymentsEnabled =
+        context.watch<AppDataProvider>().appConfig?.paymentsEnabled == true;
     // final primaryGradient = LinearGradient(
     //   colors: [colorScheme.primary, colorScheme.secondary],
     //   begin: Alignment.topLeft,
@@ -103,8 +107,8 @@ class PoemCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Access indicator
-                if (!poem.isFree)
+                // Access indicator — hide subscription badge when payments are off
+                if (!poem.isFree && paymentsEnabled)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -122,7 +126,7 @@ class PoemCard extends StatelessWidget {
                       ],
                     ),
                     child: Text(
-                      'PRO',
+                      'По подписке',
                       style: AppTextStyles.caption.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

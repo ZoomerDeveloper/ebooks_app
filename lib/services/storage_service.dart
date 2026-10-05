@@ -11,16 +11,72 @@ class StorageService {
   }
 
   // Token Management
+  Future<void> saveAuthTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    await _secureStorage.write(
+      key: AppConstants.keyAccessToken,
+      value: accessToken,
+    );
+    await _secureStorage.write(
+      key: AppConstants.keyRefreshToken,
+      value: refreshToken,
+    );
+  }
+
+  Future<void> saveAccessToken(String accessToken) async {
+    await _secureStorage.write(
+      key: AppConstants.keyAccessToken,
+      value: accessToken,
+    );
+  }
+
+  Future<void> saveRefreshToken(String refreshToken) async {
+    await _secureStorage.write(
+      key: AppConstants.keyRefreshToken,
+      value: refreshToken,
+    );
+  }
+
   Future<void> saveToken(String token) async {
-    await _secureStorage.write(key: AppConstants.keyToken, value: token);
+    await saveAccessToken(token);
+  }
+
+  Future<String?> getAccessToken() async {
+    final token = await _secureStorage.read(key: AppConstants.keyAccessToken);
+    if (token != null && token.isNotEmpty) {
+      return token;
+    }
+
+    final legacyToken = await _secureStorage.read(
+      key: AppConstants.keyLegacyToken,
+    );
+    if (legacyToken != null && legacyToken.isNotEmpty) {
+      await saveAccessToken(legacyToken);
+      await _secureStorage.delete(key: AppConstants.keyLegacyToken);
+      return legacyToken;
+    }
+
+    return null;
+  }
+
+  Future<String?> getRefreshToken() async {
+    return await _secureStorage.read(key: AppConstants.keyRefreshToken);
   }
 
   Future<String?> getToken() async {
-    return await _secureStorage.read(key: AppConstants.keyToken);
+    return await getAccessToken();
+  }
+
+  Future<void> deleteAuthTokens() async {
+    await _secureStorage.delete(key: AppConstants.keyAccessToken);
+    await _secureStorage.delete(key: AppConstants.keyRefreshToken);
+    await _secureStorage.delete(key: AppConstants.keyLegacyToken);
   }
 
   Future<void> deleteToken() async {
-    await _secureStorage.delete(key: AppConstants.keyToken);
+    await deleteAuthTokens();
   }
 
   // Onboarding
@@ -30,6 +86,20 @@ class StorageService {
 
   bool isOnboardingComplete() {
     return _prefs?.getBool(AppConstants.keyOnboardingComplete) ?? false;
+  }
+
+  // Last poem per letter (resume by letter)
+  Future<void> saveLastPoemIdForLetter(String letter, int id) async {
+    await _prefs?.setInt(
+      '${AppConstants.keyLastPoemByLetterPrefix}${letter.toUpperCase()}',
+      id,
+    );
+  }
+
+  int? getLastPoemIdForLetter(String letter) {
+    return _prefs?.getInt(
+      '${AppConstants.keyLastPoemByLetterPrefix}${letter.toUpperCase()}',
+    );
   }
 
   // Clear all data

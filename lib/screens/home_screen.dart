@@ -8,6 +8,8 @@ import '../widgets/poem_card.dart';
 import '../providers/poem_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/app_data_provider.dart';
+import '../services/storage_service.dart';
+import 'poem_screen.dart';
 import 'tabs/favorites_tab.dart';
 import 'tabs/stats_tab.dart';
 import 'tabs/premium_tab.dart';
@@ -30,12 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Load first letter by default
+    // Preload counts for alphabet cards
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PoemProvider>().preloadLetterPoemCounts(
         AppConstants.alphabet,
       );
-      _selectLetter('A');
       // Load app config for subscription page (no auth required)
       final appDataProvider = context.read<AppDataProvider>();
       appDataProvider.loadAppConfig();
@@ -87,37 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _selectLetter(String letter) {
-    // Toggle: if same letter clicked, deselect it
-    if (_selectedLetter == letter) {
-      setState(() {
-        _selectedLetter = null;
-        _isSearching = false;
-        _searchController.clear();
-      });
-      // Clear poems for smooth collapse animation
-      context.read<PoemProvider>().clearPoems();
-      return;
-    }
-
-    setState(() {
-      _selectedLetter = letter;
-      _isSearching = false;
-      _searchController.clear();
-    });
-    context.read<PoemProvider>().loadPoemsByLetter(letter);
-
-    // Auto-scroll to selected letter
-    final index = AppConstants.alphabet.indexOf(letter);
-    if (index != -1 && _scrollController.hasClients) {
-      _scrollController.animateTo(
-        index * 44.0, // width (36) + padding (8)
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
-
   void _search(String query) {
     if (query.isEmpty) {
       if (_selectedLetter != null) {
@@ -135,10 +105,133 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openFirstPoemForLetter(String letter) async {
+    final poemProvider = context.read<PoemProvider>();
+    final storageService = context.read<StorageService>();
+
+    setState(() {
+      _selectedLetter = null;
+      _isSearching = false;
+      _searchController.clear();
+    });
+
+    // Resume from the last poem the user read for this letter
+    final savedPoemId = storageService.getLastPoemIdForLetter(letter);
+    if (savedPoemId != null) {
+      _openLetterPoem(savedPoemId);
+      return;
+    }
+
+    final knownCount = poemProvider.poemCountForLetter(letter);
+    if (knownCount == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Для буквы $letter стихи не найдены')),
+      );
+      return;
+    }
+
+    final fastPoemId = poemProvider.firstPoemIdForLetter(letter);
+    if (fastPoemId != null) {
+      _openLetterPoem(fastPoemId);
+      return;
+    }
+
+    await poemProvider.preloadLetterPoemCounts([letter], forceRefresh: true);
+    if (!mounted) return;
+
+    final refreshedFastPoemId = poemProvider.firstPoemIdForLetter(letter);
+    if (refreshedFastPoemId != null) {
+      _openLetterPoem(refreshedFastPoemId);
+      return;
+    }
+
+    await poemProvider.loadPoemsByLetter(letter);
+    if (!mounted) return;
+
+    final poems = poemProvider.poems;
+    if (poems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Для буквы $letter стихи не найдены')),
+      );
+      return;
+    }
+
+    _openLetterPoem(poems.first.id);
+  }
+
+  void _openLetterPoem(int poemId) {
+    Navigator.of(context).pushNamed(
+      '/poem',
+      arguments: PoemScreenArgs(poemId: poemId, openedFromLetter: true),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    final appDataProvider = context.watch<AppDataProvider>();
     final isGuest = !authProvider.isAuthenticated;
+    final paymentsEnabled = appDataProvider.appConfig?.paymentsEnabled == true;
+
+    final pages = <Widget>[
+      _buildHomePage(isGuest),
+      isGuest
+          ? _buildAuthPlaceholder('Избранное')
+          : FavoritesTab(
+              onNavigateToHome: () {
+                _pageController.animateToPage(
+                  0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
+            ),
+      isGuest ? _buildAuthPlaceholder('Статистика') : const StatsTab(),
+      if (paymentsEnabled) const PremiumTab(),
+    ];
+
+    final navItems = <BottomNavigationBarItem>[
+      BottomNavigationBarItem(
+        icon: _AnimatedNavIcon(
+          iconPath: 'assets/icons/home.svg',
+          isSelected: _currentNavIndex == 0,
+        ),
+        label: 'Главная',
+      ),
+      BottomNavigationBarItem(
+        icon: _AnimatedNavIcon(
+          iconPath: 'assets/icons/favorite.svg',
+          isSelected: _currentNavIndex == 1,
+        ),
+        label: 'Избранное',
+      ),
+      BottomNavigationBarItem(
+        icon: _AnimatedNavIcon(
+          iconPath: 'assets/icons/stat.svg',
+          isSelected: _currentNavIndex == 2,
+        ),
+        label: 'Статистика',
+      ),
+      if (paymentsEnabled)
+        BottomNavigationBarItem(
+          icon: _AnimatedNavIcon(
+            iconPath: 'assets/icons/user.svg',
+            isSelected: _currentNavIndex == 3,
+          ),
+          label: 'Premium',
+        ),
+    ];
+
+    if (_currentNavIndex >= pages.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _currentNavIndex = 0;
+          });
+          _pageController.jumpToPage(0);
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -148,27 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             _currentNavIndex = index;
           });
+          _onPageChanged(index);
         },
-        children: [
-          // Home Page
-          _buildHomePage(isGuest),
-          // Favorites Page
-          isGuest
-              ? _buildAuthPlaceholder('Избранное')
-              : FavoritesTab(
-                  onNavigateToHome: () {
-                    _pageController.animateToPage(
-                      0,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  },
-                ),
-          // Stats Page
-          isGuest ? _buildAuthPlaceholder('Статистика') : const StatsTab(),
-          // Subscription Page
-          const PremiumTab(),
-        ],
+        children: pages,
       ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -180,42 +255,16 @@ class _HomeScreenState extends State<HomeScreen> {
             unselectedItemColor: AppColors.textLight,
             type: BottomNavigationBarType.fixed,
             backgroundColor: AppColors.white,
-            selectedLabelStyle: AppTextStyles.caption.copyWith(
+            selectedLabelStyle: AppTextStyles.bodySmall.copyWith(
               fontWeight: FontWeight.w600,
               fontSize: 11,
             ),
-            unselectedLabelStyle: AppTextStyles.caption.copyWith(fontSize: 11),
+            unselectedLabelStyle: AppTextStyles.bodySmall.copyWith(
+              fontSize: 11,
+            ),
             elevation: 0,
-            items: [
-              BottomNavigationBarItem(
-                icon: _AnimatedNavIcon(
-                  iconPath: 'assets/icons/home.svg',
-                  isSelected: _currentNavIndex == 0,
-                ),
-                label: 'Главная',
-              ),
-              BottomNavigationBarItem(
-                icon: _AnimatedNavIcon(
-                  iconPath: 'assets/icons/favorite.svg',
-                  isSelected: _currentNavIndex == 1,
-                ),
-                label: 'Избранное',
-              ),
-              BottomNavigationBarItem(
-                icon: _AnimatedNavIcon(
-                  iconPath: 'assets/icons/stat.svg',
-                  isSelected: _currentNavIndex == 2,
-                ),
-                label: 'Статистика',
-              ),
-              BottomNavigationBarItem(
-                icon: _AnimatedNavIcon(
-                  iconPath: 'assets/icons/user.svg',
-                  isSelected: _currentNavIndex == 3,
-                ),
-                label: 'Premium',
-              ),
-            ],
+            enableFeedback: false,
+            items: navItems,
             onTap: (index) {
               setState(() {
                 _currentNavIndex = index;
@@ -245,7 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
               toolbarHeight: 168,
               elevation: 0,
               automaticallyImplyLeading: false,
-              backgroundColor: AppColors.primary,
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
               flexibleSpace: FlexibleSpaceBar(
                 collapseMode: CollapseMode.parallax,
                 centerTitle: false,
@@ -253,6 +303,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 background: Container(
                   decoration: const BoxDecoration(
                     gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(24),
+                      bottomRight: Radius.circular(24),
+                    ),
                   ),
                   child: SafeArea(
                     child: Padding(
@@ -265,10 +319,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Epoems',
+                                'Smart Poems',
                                 style: AppTextStyles.h1.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 30,
                                 ),
                               ),
                               if (isGuest)
@@ -321,14 +376,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          // const SizedBox(height: 8),
                           Text(
-                            'Учите английский через поэзию',
+                            'Миры английских слов в стихах',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: Colors.white.withOpacity(0.9),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
                           TextField(
                             controller: _searchController,
                             onChanged: _search,
@@ -623,7 +678,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : _formatPoemCount(poemCount);
 
     return GestureDetector(
-      onTap: () => _selectLetter(letter),
+      onTap: () => _openFirstPoemForLetter(letter),
       child: Container(
         height: 170,
         decoration: BoxDecoration(
@@ -648,10 +703,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.only(bottom: 14),
                 child: Text(
                   letter,
-                  style: AppTextStyles.h1.copyWith(
-                    fontFamily: 'Rampart One',
+                  style: AppTextStyles.overline.copyWith(
+                    // fontFamily: 'Rampart One',
                     color: isSelected ? Colors.white : AppColors.primary,
-                    fontWeight: FontWeight.bold,
+                    // fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w300,
                     fontSize: 72,
                   ),
                 ),

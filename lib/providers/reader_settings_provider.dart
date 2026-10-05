@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:epoems/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
@@ -12,6 +15,12 @@ class ReaderSettingsProvider with ChangeNotifier {
 
   ReaderBackgroundMode _backgroundMode = ReaderBackgroundMode.white;
   ReaderAccentColor _accentColor = ReaderAccentColor.green;
+  double _fontSizeScale = 1.0;
+
+  // Meaning-count filter: one selection for all letters, or one per letter.
+  bool _meaningFilterAllLetters = false;
+  Set<int> _globalMeaningFilter = {};
+  final Map<String, Set<int>> _meaningFilterByLetter = {};
 
   List<ReaderBackgroundMode> _availableBackgroundModes = ReaderBackgroundMode
       .values
@@ -37,9 +46,19 @@ class ReaderSettingsProvider with ChangeNotifier {
 
   ReaderBackgroundMode get backgroundMode => _backgroundMode;
   ReaderAccentColor get accentColor => _accentColor;
+  double get fontSizeScale => _fontSizeScale;
   List<ReaderBackgroundMode> get availableBackgroundModes =>
       _availableBackgroundModes;
   List<ReaderAccentColor> get availableAccentColors => _availableAccentColors;
+  bool get meaningFilterAllLetters => _meaningFilterAllLetters;
+
+  /// Selected meaning-count buckets for [letter]; empty means no filter.
+  Set<int> meaningFilterFor(String letter) {
+    if (_meaningFilterAllLetters) return Set.unmodifiable(_globalMeaningFilter);
+    return Set.unmodifiable(
+      _meaningFilterByLetter[letter.toUpperCase()] ?? const <int>{},
+    );
+  }
 
   Color get backgroundColor {
     return _backgroundColors[_backgroundMode] ?? Colors.white;
@@ -70,7 +89,7 @@ class ReaderSettingsProvider with ChangeNotifier {
       case ReaderBackgroundMode.papyrus:
         return const Color(0xFF8B6A3E);
       case ReaderBackgroundMode.white:
-        return const Color(0xFF6366F1);
+        return AppColors.primary;
     }
   }
 
@@ -89,10 +108,10 @@ class ReaderSettingsProvider with ChangeNotifier {
           colors: [Color(0xFF7C5B34), Color(0xFFB48A55)],
         );
       case ReaderBackgroundMode.white:
-        return const LinearGradient(
+        return LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+          colors: [AppColors.primary, AppColors.secondary],
         );
     }
   }
@@ -119,12 +138,19 @@ class ReaderSettingsProvider with ChangeNotifier {
       );
     }
 
+    final scale = prefs.getDouble(AppConstants.keyFontSizeScale);
+    if (scale != null) {
+      _fontSizeScale = scale.clamp(0.8, 1.4);
+    }
+
     if (accent != null) {
       _accentColor = ReaderAccentColor.values.firstWhere(
         (value) => value.name == accent,
         orElse: () => ReaderAccentColor.green,
       );
     }
+
+    _loadMeaningFilter(prefs);
 
     await _loadThemesFromServer(
       hasStoredBackground: hasStoredBackground,
@@ -260,6 +286,88 @@ class ReaderSettingsProvider with ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.keyReaderAccentColor, color.name);
+  }
+
+  Future<void> setFontSizeScale(double scale) async {
+    _fontSizeScale = scale.clamp(0.8, 1.4);
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(AppConstants.keyFontSizeScale, _fontSizeScale);
+  }
+
+  Future<void> toggleMeaningFilterBucket(String letter, int bucket) async {
+    final selection = _editableMeaningFilter(letter);
+    if (!selection.remove(bucket)) selection.add(bucket);
+    notifyListeners();
+    await _saveMeaningFilter();
+  }
+
+  Future<void> clearMeaningFilter(String letter) async {
+    _editableMeaningFilter(letter).clear();
+    notifyListeners();
+    await _saveMeaningFilter();
+  }
+
+  /// Switching carries the current letter's selection over to the new scope.
+  Future<void> setMeaningFilterAllLetters(String letter, bool value) async {
+    if (_meaningFilterAllLetters == value) return;
+    final key = letter.toUpperCase();
+    if (value) {
+      _globalMeaningFilter = {...?_meaningFilterByLetter[key]};
+    } else {
+      _meaningFilterByLetter[key] = {..._globalMeaningFilter};
+      _globalMeaningFilter = {};
+    }
+    _meaningFilterAllLetters = value;
+    notifyListeners();
+    await _saveMeaningFilter();
+  }
+
+  Set<int> _editableMeaningFilter(String letter) {
+    if (_meaningFilterAllLetters) return _globalMeaningFilter;
+    return _meaningFilterByLetter.putIfAbsent(letter.toUpperCase(), () => {});
+  }
+
+  void _loadMeaningFilter(SharedPreferences prefs) {
+    _meaningFilterAllLetters =
+        prefs.getBool(AppConstants.keyMeaningFilterAllLetters) ?? false;
+    _globalMeaningFilter =
+        (prefs.getStringList(AppConstants.keyMeaningFilterGlobal) ?? [])
+            .map(int.tryParse)
+            .whereType<int>()
+            .toSet();
+    final byLetterRaw = prefs.getString(AppConstants.keyMeaningFilterByLetter);
+    if (byLetterRaw == null) return;
+    try {
+      final decoded = jsonDecode(byLetterRaw) as Map<String, dynamic>;
+      decoded.forEach((letter, buckets) {
+        _meaningFilterByLetter[letter] = (buckets as List)
+            .whereType<int>()
+            .toSet();
+      });
+    } catch (_) {
+      // Ignore a corrupted value; filters just start empty.
+    }
+  }
+
+  Future<void> _saveMeaningFilter() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      AppConstants.keyMeaningFilterAllLetters,
+      _meaningFilterAllLetters,
+    );
+    await prefs.setStringList(
+      AppConstants.keyMeaningFilterGlobal,
+      _globalMeaningFilter.map((bucket) => '$bucket').toList(),
+    );
+    await prefs.setString(
+      AppConstants.keyMeaningFilterByLetter,
+      jsonEncode({
+        for (final entry in _meaningFilterByLetter.entries)
+          if (entry.value.isNotEmpty) entry.key: entry.value.toList(),
+      }),
+    );
   }
 }
 

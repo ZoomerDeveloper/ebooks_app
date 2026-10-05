@@ -29,7 +29,12 @@ class Poem {
   final String meanings;
   final String letter;
   final bool isFree;
+  final bool isLearned;
   final List<PoemToken> tokens;
+  // Number of highlighted meaning words; sent even when tokens are hidden.
+  final int meaningsCount;
+  // Ready-made meanings list, shown verbatim; empty when tokens are hidden.
+  final List<String> meaningLines;
 
   Poem({
     required this.id,
@@ -38,7 +43,10 @@ class Poem {
     required this.meanings,
     required this.letter,
     required this.isFree,
+    this.isLearned = false,
     required this.tokens,
+    this.meaningsCount = 0,
+    this.meaningLines = const [],
   });
 
   factory Poem.fromJson(Map<String, dynamic> json) {
@@ -49,11 +57,18 @@ class Poem {
       meanings: json['meanings'] ?? '',
       letter: json['letter'] ?? '',
       isFree: json['is_free'] ?? false,
+      isLearned: json['is_learned'] ?? false,
       tokens:
           (json['tokens'] as List<dynamic>?)
               ?.map((token) => PoemToken.fromJson(token))
               .toList() ??
           [],
+      meaningsCount: json['meanings_count'] ?? 0,
+      meaningLines:
+          (json['meaning_lines'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList() ??
+          const [],
     );
   }
 
@@ -65,7 +80,10 @@ class Poem {
       'meanings': meanings,
       'letter': letter,
       'is_free': isFree,
+      'is_learned': isLearned,
       'tokens': tokens.map((token) => token.toJson()).toList(),
+      'meanings_count': meaningsCount,
+      'meaning_lines': meaningLines,
     };
   }
 

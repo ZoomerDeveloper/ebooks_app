@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/app_navigation_service.dart';
 import '../services/storage_service.dart';
 import '../models/user.dart';
 
@@ -14,6 +15,10 @@ class AuthProvider with ChangeNotifier {
 
   AuthProvider(this._apiService, this._storageService);
 
+  Future<void> _handleAuthFailure() async {
+    await logout(redirectToLogin: true);
+  }
+
   bool get isAuthenticated => _isAuthenticated;
   User? get user => _user;
   bool get isLoading => _isLoading;
@@ -24,9 +29,11 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await _storageService.getToken();
-      if (token != null) {
-        _apiService.setToken(token);
+      _apiService.setAuthFailureHandler(_handleAuthFailure);
+
+      final accessToken = await _storageService.getAccessToken();
+      if (accessToken != null) {
+        _apiService.setToken(accessToken);
         _isAuthenticated = true;
       }
     } catch (e) {
@@ -66,14 +73,18 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.loginByCode(email, code);
 
-      if (response['access_token'] == null) {
-        throw Exception('Токен не получен от сервера');
+      if (response['access_token'] == null || response['refresh_token'] == null) {
+        throw Exception('Токены не получены от сервера');
       }
 
-      final token = response['access_token'] as String;
+      final accessToken = response['access_token'] as String;
+      final refreshToken = response['refresh_token'] as String;
 
-      await _storageService.saveToken(token);
-      _apiService.setToken(token);
+      await _storageService.saveAuthTokens(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      );
+      _apiService.setToken(accessToken);
       _isAuthenticated = true;
 
       if (response['user'] != null) {
@@ -102,10 +113,22 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await _apiService.login(email, password);
-      final token = response['access_token'];
+      final accessToken = response['access_token']?.toString();
+      final refreshToken = response['refresh_token']?.toString();
 
-      await _storageService.saveToken(token);
-      _apiService.setToken(token);
+      if (accessToken == null || accessToken.isEmpty) {
+        throw Exception('Токен доступа не получен от сервера');
+      }
+
+      if (refreshToken == null || refreshToken.isEmpty) {
+        throw Exception('Refresh токен не получен от сервера');
+      }
+
+      await _storageService.saveAuthTokens(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      );
+      _apiService.setToken(accessToken);
       _isAuthenticated = true;
 
       if (response['user'] != null) {
@@ -143,12 +166,41 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> logout() async {
-    await _storageService.deleteToken();
+  Future<void> logout({bool redirectToLogin = false}) async {
+    await _storageService.deleteAuthTokens();
     _apiService.setToken(null);
     _isAuthenticated = false;
     _user = null;
     notifyListeners();
+
+    if (redirectToLogin) {
+      final navigator = AppNavigationService.navigatorKey.currentState;
+      if (navigator != null) {
+        navigator.pushNamedAndRemoveUntil('/login', (route) => false);
+      }
+    }
+  }
+
+  Future<bool> deleteAccount() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _apiService.deleteAccount();
+      await _storageService.deleteAuthTokens();
+      _apiService.setToken(null);
+      _isAuthenticated = false;
+      _user = null;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   void clearError() {

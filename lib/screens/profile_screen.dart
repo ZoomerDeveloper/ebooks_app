@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../constants/app_colors.dart';
+import '../constants/app_constants.dart';
 import '../constants/app_text_styles.dart';
 import '../widgets/gradient_button.dart';
 import '../providers/auth_provider.dart';
 import '../providers/app_data_provider.dart';
-import 'package:intl/intl.dart';
+import 'read_history_screen.dart';
+import 'webview_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,7 +22,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppDataProvider>().loadSubscription();
+      final appDataProvider = context.read<AppDataProvider>();
+      appDataProvider.loadAppConfig(forceRefresh: true);
+
+      if (context.read<AuthProvider>().isAuthenticated) {
+        appDataProvider.loadSubscription(forceRefresh: true);
+      }
     });
   }
 
@@ -85,71 +93,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Subscription Status
               Consumer<AppDataProvider>(
                 builder: (context, appDataProvider, _) {
-                  final subscription = appDataProvider.subscription;
+                  final paymentsEnabled =
+                      appDataProvider.appConfig?.paymentsEnabled == true;
 
-                  return Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.textLight.withOpacity(0.2),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  if (!paymentsEnabled) return const SizedBox.shrink();
+
+                  final subscription = appDataProvider.subscription;
+                  final hasSubscription =
+                      subscription?.hasSubscription == true;
+
+                  return Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.textLight.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              subscription?.hasSubscription == true
-                                  ? Icons.workspace_premium
-                                  : Icons.lock_outline,
-                              color: subscription?.hasSubscription == true
-                                  ? AppColors.accent
-                                  : AppColors.textLight,
+                            Row(
+                              children: [
+                                Icon(
+                                  hasSubscription
+                                      ? Icons.workspace_premium
+                                      : Icons.lock_outline,
+                                  color: hasSubscription
+                                      ? AppColors.accent
+                                      : AppColors.textLight,
+                                ),
+                                const SizedBox(width: 12),
+                                Text('Статус подписки', style: AppTextStyles.h4),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Text('Статус подписки', style: AppTextStyles.h4),
+                            const SizedBox(height: 12),
+                            Text(
+                              hasSubscription
+                                  ? 'Premium активна'
+                                  : 'Бесплатный план',
+                              style: AppTextStyles.bodyLarge.copyWith(
+                                color: hasSubscription
+                                    ? AppColors.success
+                                    : AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (subscription?.expiresAt != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Истекает: ${DateFormat('dd MMM yyyy', 'ru').format(subscription!.expiresAt!)}',
+                                style: AppTextStyles.bodySmall,
+                              ),
+                            ],
+                            if (!hasSubscription) ...[
+                              const SizedBox(height: 16),
+                              GradientButton(
+                                text: 'Оформить подписку',
+                                onPressed: () {
+                                  Navigator.of(context)
+                                      .pushNamed('/subscription');
+                                },
+                              ),
+                            ],
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          subscription?.hasSubscription == true
-                              ? 'Premium активна'
-                              : 'Бесплатный план',
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            color: subscription?.hasSubscription == true
-                                ? AppColors.success
-                                : AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (subscription?.expiresAt != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Истекает: ${DateFormat('dd MMM yyyy', 'ru').format(subscription!.expiresAt!)}',
-                            style: AppTextStyles.bodySmall,
-                          ),
-                        ],
-                        if (subscription?.hasSubscription != true) ...[
-                          const SizedBox(height: 16),
-                          GradientButton(
-                            text: 'Обновить до Premium',
-                            onPressed: () {
-                              Navigator.of(context).pushNamed('/subscription');
-                            },
-                          ),
-                        ],
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   );
                 },
               ),
-              const SizedBox(height: 16),
               // Quick Links
               _buildQuickLink(
                 icon: Icons.bar_chart,
@@ -167,12 +186,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
               const SizedBox(height: 12),
-              _buildQuickLink(
-                icon: Icons.subscriptions,
-                title: 'Premium',
-                onTap: () {
-                  Navigator.of(context).pushNamed('/subscription');
+              Consumer<AppDataProvider>(
+                builder: (context, appDataProvider, _) {
+                  final paymentsEnabled =
+                      appDataProvider.appConfig?.paymentsEnabled == true;
+
+                  if (!paymentsEnabled) {
+                    return const SizedBox(height: 20);
+                  }
+
+                  final subscription = appDataProvider.subscription;
+                  final title = subscription?.hasSubscription == true
+                      ? 'Подписка'
+                      : 'Оформить подписку';
+
+                  return Column(
+                    children: [
+                      _buildQuickLink(
+                        icon: Icons.history,
+                        title: 'История чтения',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const ReadHistoryScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildQuickLink(
+                        icon: Icons.subscriptions,
+                        title: title,
+                        onTap: () {
+                          Navigator.of(context).pushNamed('/subscription');
+                        },
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  );
                 },
+              ),
+              _buildQuickLink(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Политика конфиденциальности',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const WebViewScreen(
+                      url: AppConstants.privacyPolicyUrl,
+                      title: 'Политика конфиденциальности',
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 32),
               // Logout Button
@@ -188,9 +252,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
                 isOutlined: true,
               ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: _showDeleteAccountDialog,
+                child: Text(
+                  'Удалить аккаунт',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.red,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Удалить аккаунт'),
+        content: const Text(
+          'Вы уверены? Все данные аккаунта, включая избранное, '
+          'статистику и подписку, будут удалены безвозвратно.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Отмена',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final authProvider = context.read<AuthProvider>();
+              final success = await authProvider.deleteAccount();
+              if (!mounted) return;
+              if (success) {
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil('/home', (route) => false);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      authProvider.error ?? 'Не удалось удалить аккаунт',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Text(
+              'Удалить',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
